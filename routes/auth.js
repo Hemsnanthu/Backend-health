@@ -3,19 +3,24 @@ console.log("🔥 AUTH FILE CONNECTED");
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const fs = require("fs");
 
 const router = express.Router();
-
-// ✅ Load JWT Secret FIRST
 const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error("JWT_SECRET not defined");
-}
 
-// ✅ Temporary in-memory DB
-let users = [];
+// 🔐 Load users from file
+const loadUsers = () => {
+  if (!fs.existsSync("users.json")) return [];
+  return JSON.parse(fs.readFileSync("users.json"));
+};
 
-// ✅ Test Route
+const saveUsers = (users) => {
+  fs.writeFileSync("users.json", JSON.stringify(users, null, 2));
+};
+
+let users = loadUsers();
+
+// ✅ TEST
 router.get("/test", (req, res) => {
   res.send("API WORKING ✅");
 });
@@ -25,18 +30,17 @@ router.post("/register", async (req, res) => {
   const { name, email, password, role } = req.body;
 
   if (!name || !email || !password) {
-    return res.status(400).json({ message: "All fields are required" });
+    return res.status(400).json({ message: "All fields required" });
   }
 
-  const existingUser = users.find((u) => u.email === email);
-  if (existingUser) {
+  if (users.find(u => u.email === email)) {
     return res.status(409).json({ message: "User already exists" });
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
   const newUser = {
-    id: users.length + 1,
+    id: Date.now(),
     name,
     email,
     password: hashedPassword,
@@ -44,15 +48,11 @@ router.post("/register", async (req, res) => {
   };
 
   users.push(newUser);
+  saveUsers(users);
 
   res.status(201).json({
-    message: "User registered successfully",
-    user: {
-      id: newUser.id,
-      name,
-      email,
-      role: newUser.role,
-    },
+    message: "Registered successfully",
+    user: { id: newUser.id, name, email, role: newUser.role },
   });
 });
 
@@ -60,18 +60,14 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ message: "Email and password required" });
-  }
-
-  const user = users.find((u) => u.email === email);
+  const user = users.find(u => u.email === email);
   if (!user) {
-    return res.status(401).json({ message: "User not found" });
+    return res.status(401).json({ message: "Invalid credentials" });
   }
 
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) {
-    return res.status(401).json({ message: "Wrong password" });
+  const match = await bcrypt.compare(password, user.password);
+  if (!match) {
+    return res.status(401).json({ message: "Invalid credentials" });
   }
 
   const token = jwt.sign(
