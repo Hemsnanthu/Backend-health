@@ -14,21 +14,18 @@ const app = express();
 // ✅ Connect to MongoDB
 connectDB();
 
-// ✅ CORS (IMPORTANT FIX)
+// ✅ CORS (FIXED)
 app.use(
   cors({
     origin: [
-      "http://localhost:5173",              // local frontend
-      "https://your-frontend.vercel.app",   // future deployment (optional)
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "https://your-frontend.vercel.app",
     ],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
   })
 );
-
-// ✅ Handle preflight requests
-app.options("*", cors());
 
 // ✅ Body parser
 app.use(express.json());
@@ -84,42 +81,26 @@ app.post("/attendance", (req, res) => {
     id: Date.now().toString(),
     ...req.body,
   };
-
   attendanceRecords.push(newRecord);
   res.status(201).json(newRecord);
 });
 
 app.put("/attendance/:id", (req, res) => {
-  const { id } = req.params;
-  const index = attendanceRecords.findIndex((r) => r.id === id);
-
-  if (index === -1) {
-    return res.status(404).json({ message: "Record not found" });
-  }
-
-  attendanceRecords[index] = {
-    ...attendanceRecords[index],
-    ...req.body,
-  };
-
+  const index = attendanceRecords.findIndex(r => r.id === req.params.id);
+  if (index === -1) return res.status(404).json({ message: "Record not found" });
+  attendanceRecords[index] = { ...attendanceRecords[index], ...req.body };
   res.json(attendanceRecords[index]);
 });
 
 app.delete("/attendance/:id", (req, res) => {
-  const { id } = req.params;
-  const index = attendanceRecords.findIndex((r) => r.id === id);
-
-  if (index === -1) {
-    return res.status(404).json({ message: "Record not found" });
-  }
-
+  const index = attendanceRecords.findIndex(r => r.id === req.params.id);
+  if (index === -1) return res.status(404).json({ message: "Record not found" });
   attendanceRecords.splice(index, 1);
   res.json({ message: "Record deleted" });
 });
 
 // ✅ START SERVER
 const PORT = process.env.PORT || 5000;
-
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
